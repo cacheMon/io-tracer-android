@@ -75,6 +75,14 @@ APK on every push/PR and uploads the APK as an artifact.
    ```bash
    adb pull /sdcard/Android/data/com.cachemon.iotracer/files/traces ./traces
    ```
+   On Android 11+, scoped storage can block `adb` from reading another app's
+   `Android/data` directly (and `adb root` is unavailable on most Magisk-rooted
+   retail devices). If the pull fails, use the in-app **Share** button, or copy
+   to a public directory as root first:
+   ```bash
+   adb shell "su -c 'cp -r /sdcard/Android/data/com.cachemon.iotracer/files/traces /data/local/tmp/traces'"
+   adb pull /data/local/tmp/traces ./traces
+   ```
 
 ## Reading the output
 

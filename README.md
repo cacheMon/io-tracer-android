@@ -53,6 +53,16 @@ Pull the results:
 adb pull /sdcard/Android/data/com.cachemon.iotracer/files/traces ./traces
 ```
 
+On Android 11+, scoped storage can block `adb` from reading another app's
+`Android/data` directly (and `adb root` is unavailable on most Magisk-rooted
+retail devices). If the pull fails, use the app's **Share** button, or copy the
+session to a public directory as root first:
+
+```bash
+adb shell "su -c 'cp -r /sdcard/Android/data/com.cachemon.iotracer/files/traces /data/local/tmp/traces'"
+adb pull /data/local/tmp/traces ./traces
+```
+
 Full build/run/architecture details — and the note on keeping the Kotlin engine
 in sync with the Python schema — are in **[docs/ANDROID_APP.md](docs/ANDROID_APP.md)**.
 
@@ -101,8 +111,12 @@ mode** (process/filesystem/system specs, no `ds`/`fs` event streams).
 
 ## Output
 
+Each run produces a self-describing session directory with the same layout. The
+**app** writes it under `…/files/traces/<session>/`; the **CLI** writes straight
+into its `-o` output directory.
+
 ```
-{output_dir}/<session>/
+<session>/                      # app: …/files/traces/<session>/  ·  CLI: the -o dir
 ├── manifest.json               # schema + machine id + clock offset + row counts
 ├── ds/                         # block I/O events       (.csv.gz app / .csv.zst CLI)
 ├── fs/                         # filesystem events      (CLI --trace-fs)
@@ -121,6 +135,8 @@ latency is recovered from the issue/complete tracepoint pair.
 ```python
 import glob, pandas as pd
 # pandas reads .gz and .zst natively (.zst needs the `zstandard` package).
+# App traces live in per-session subdirs (traces/<session>/ds/); the CLI writes
+# straight into its -o directory (trace/ds/), so it has no extra session level.
 files = glob.glob("traces/*/ds/ds_*.csv.gz") + glob.glob("trace/ds/ds_*.csv.zst")
 df = pd.concat(pd.read_csv(f) for f in files)
 print(df.groupby("operation")["latency_ms"].describe())
