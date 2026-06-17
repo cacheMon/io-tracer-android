@@ -140,15 +140,21 @@ df = pd.concat(pd.read_csv(f) for f in files)
 print(df.groupby("operation")["latency_ms"].describe())
 ```
 
-To stream one file with the stdlib:
+To stream one file with the stdlib (`csv.DictReader` needs a **text** stream):
 
 ```python
-import csv, gzip, io
-# .csv.gz (app):
+import csv, gzip, io, zstandard
+
+# .csv.gz (app) — gzip.open with "rt" already yields text:
 with gzip.open("ds_0001.csv.gz", "rt", encoding="utf-8") as fh:
     for row in csv.DictReader(fh):
         print(row["operation"], row["size"], row["latency_ms"])
-# .csv.zst (CLI): swap in zstandard.ZstdDecompressor().stream_reader(open(path, "rb")).
+
+# .csv.zst (CLI) — the decompressor yields bytes, so wrap it in TextIOWrapper:
+with open("ds_0001.csv.zst", "rb") as raw:
+    fh = io.TextIOWrapper(zstandard.ZstdDecompressor().stream_reader(raw), encoding="utf-8")
+    for row in csv.DictReader(fh):
+        print(row["operation"], row["size"], row["latency_ms"])
 ```
 
 ## See also
