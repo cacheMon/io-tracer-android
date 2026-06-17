@@ -66,8 +66,12 @@ adb pull /data/local/tmp/traces ./traces
 Full build/run/architecture details — and the note on keeping the Kotlin engine
 in sync with the Python schema — are in **[docs/ANDROID_APP.md](docs/ANDROID_APP.md)**.
 
-Without root the app still runs, but only the process/system snapshots are
-collected (no system-wide block I/O).
+### No rooted device?
+
+Block-I/O tracing needs root (the kernel ftrace interface is root-only). On an
+**unrooted** device you can still collect process/system/filesystem **snapshots**
+using the Python CLI in Termux, and there's an emulator path for getting root
+without rooting a phone — see **[docs/UNROOTED.md](docs/UNROOTED.md)**.
 
 ---
 
