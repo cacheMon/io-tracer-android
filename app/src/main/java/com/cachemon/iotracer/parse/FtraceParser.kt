@@ -79,13 +79,15 @@ object FtraceParser {
     private fun devToMajMin(dev: String) = dev.replace(",", ":")
 
     fun parseIssue(body: String): Issue? {
-        val m = ISSUE.find(body.trim()) ?: return null
+        // parseCommon already strips leading space before `body`, and trailing
+        // space doesn't affect find(), so no trim() allocation is needed.
+        val m = ISSUE.find(body) ?: return null
         val (dev, rwbs, bytes, sector, nsect) = m.destructured
         return Issue(devToMajMin(dev), rwbs, bytes.toLong(), sector.toLong(), nsect.toLong())
     }
 
     fun parseComplete(body: String): Complete? {
-        val m = COMPLETE.find(body.trim()) ?: return null
+        val m = COMPLETE.find(body) ?: return null
         val (dev, rwbs, sector, nsect, err) = m.destructured
         return Complete(devToMajMin(dev), rwbs, sector.toLong(), nsect.toLong(), err.toInt())
     }

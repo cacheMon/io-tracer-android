@@ -75,7 +75,7 @@ class FtraceParserTest {
         assertEquals(4096L, row.size)
         assertEquals("259:0", row.device)
         assertEquals(2048L, row.sector)
-        assertEquals(2.0, row.latencyMs as Double, 1e-6)
+        assertEquals(2.0, row.latencyMs!!, 1e-6)
         assertEquals(3, row.cpuId)            // completion CPU
         assertEquals(1L, row.requestId)
     }
@@ -85,10 +85,11 @@ class FtraceParserTest {
         val pairer = BlockPairer()
         val row = pairer.onComplete(FtraceParser.parseCommon(
             "x-1 [000] .... 5.0: block_rq_complete: 8,0 R () 99 + 8 [0]")!!)!!
-        assertEquals("", row.latencyMs)
+        assertNull(row.latencyMs)
+        assertNull(row.pid)
         assertEquals(8L * 512, row.size)
         assertEquals("read", row.operation)
-        assertEquals("", row.requestId)
+        assertNull(row.requestId)
     }
 
     @Test

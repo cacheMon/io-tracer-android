@@ -14,12 +14,12 @@ class BlockPairer {
     /** A completed block I/O, ready to be written as a `ds` row. */
     data class DsRow(
         val operation: String,
-        val pid: Any,            // Int, or "" when the issue was not seen
+        val pid: Int?,            // null when the issue was not seen
         val tid: String,
         val command: String,
         val sector: Long,
         val size: Long,
-        val latencyMs: Any,      // Double, or "" when unknown
+        val latencyMs: Double?,   // null when unknown
         val device: String,
         val flags: String,
         val cpuId: Int,
@@ -27,7 +27,7 @@ class BlockPairer {
         val queueLatencyMs: String,
         val commandFlags: String,
         val operationCode: String,
-        val requestId: Any,      // Long, or "" when the issue was not seen
+        val requestId: Long?,     // null when the issue was not seen
         val monoNs: Long,
     )
 
@@ -77,7 +77,7 @@ class BlockPairer {
                 command = issued.comm.take(16),
                 sector = info.sector,
                 size = if (issued.bytes != 0L) issued.bytes else issued.nsect * 512,
-                latencyMs = (Math.round(latency * 1000.0) / 1000.0),
+                latencyMs = Math.round(latency * 1000.0) / 1000.0,
                 device = info.device,
                 flags = flags,
                 cpuId = c.cpu,
@@ -92,12 +92,12 @@ class BlockPairer {
             // Completion with no recorded issue (started before tracing began).
             DsRow(
                 operation = operation,
-                pid = "",
+                pid = null,
                 tid = "",
                 command = c.comm.take(16),
                 sector = info.sector,
                 size = info.nsect * 512,
-                latencyMs = "",
+                latencyMs = null,
                 device = info.device,
                 flags = flags,
                 cpuId = c.cpu,
@@ -105,7 +105,7 @@ class BlockPairer {
                 queueLatencyMs = "",
                 commandFlags = "",
                 operationCode = "",
-                requestId = "",
+                requestId = null,
                 monoNs = c.monoNs,
             )
         }

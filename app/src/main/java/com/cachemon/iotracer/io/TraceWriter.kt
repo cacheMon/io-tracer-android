@@ -15,7 +15,7 @@ import java.util.zip.GZIPOutputStream
  *       manifest.json
  *       ds/ds_<ts>_<seq>.csv.gz
  *       process/process_<ts>_<seq>.csv.gz
- *       system_spec/*.json
+ *       system_spec/ (cpu/memory/os .json files)
  */
 class TraceWriter(
     val sessionDir: File,
@@ -65,10 +65,12 @@ class TraceWriter(
             buf.clear()
             seq[stream] = seq.getValue(stream) + 1
         }
-        val ts = nowFileStamp()
+        val ts = TimeFmt.fileStamp()
         val name = "${stream}_${ts}_${"%04d".format(seq.getValue(stream))}.csv.gz"
         val file = File(File(sessionDir, stream), name)
-        GZIPOutputStream(FileOutputStream(file)).bufferedWriter(Charsets.UTF_8).use { w ->
+        // Buffer the file stream so GZIP's compressed output is written in large
+        // chunks rather than many small syscalls.
+        GZIPOutputStream(FileOutputStream(file).buffered()).bufferedWriter(Charsets.UTF_8).use { w ->
             w.append(headers.getValue(stream)).append('\n')
             for (r in rows) {
                 w.append(r); w.append('\n')
@@ -83,7 +85,7 @@ class TraceWriter(
         flush("process")
     }
 
-    /** Write a system_spec/*.json file directly. */
+    /** Write a JSON file directly into the system_spec subdirectory. */
     fun writeSpec(filename: String, content: String) {
         File(File(sessionDir, "system_spec"), filename).writeText(content)
     }
@@ -120,10 +122,5 @@ class TraceWriter(
             .put("filename_prefix", subdir)
             .put("description", desc)
             .put("columns", arr)
-    }
-
-    private fun nowFileStamp(): String {
-        val fmt = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US)
-        return fmt.format(java.util.Date())
     }
 }

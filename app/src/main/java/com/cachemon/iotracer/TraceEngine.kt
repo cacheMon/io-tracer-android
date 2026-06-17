@@ -145,15 +145,13 @@ class TraceEngine(
 
     private val realOffset: Long = System.currentTimeMillis() * 1_000_000L - System.nanoTime()
     private fun monoToWall(monoNs: Long): String {
-        // SimpleDateFormat only resolves milliseconds; pad to the schema's
-        // microsecond shape (YYYY-MM-DD HH:MM:SS.ffffff) with a trailing 000.
+        // Reuses a thread-local formatter (see TimeFmt) — this runs once per block
+        // I/O completion, which can be thousands per second.
         val realNs = monoNs + realOffset
-        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
-        return fmt.format(java.util.Date(realNs / 1_000_000L)) + "000"
+        return com.cachemon.iotracer.io.TimeFmt.wallMillis(realNs / 1_000_000L)
     }
 
-    private fun stamp(): String =
-        java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
+    private fun stamp(): String = com.cachemon.iotracer.io.TimeFmt.sessionStamp()
 
     companion object {
         fun checkRoot(): Boolean = RootShell().available()

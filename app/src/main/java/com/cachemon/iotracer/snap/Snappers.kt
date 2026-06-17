@@ -47,14 +47,11 @@ class ProcSnapper(
         return count
     }
 
-    private fun wallNow(): String {
-        // Millisecond precision padded to the schema's microsecond shape.
-        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
-        return fmt.format(java.util.Date()) + "000"
-    }
+    private fun wallNow(): String =
+        com.cachemon.iotracer.io.TimeFmt.wall(java.util.Date())
 }
 
-/** Captures device hardware/software specs as system_spec/*.json. */
+/** Captures device hardware and software specs as JSON in the system_spec dir. */
 class SystemSnapper(
     private val root: RootShell,
     private val writer: TraceWriter,

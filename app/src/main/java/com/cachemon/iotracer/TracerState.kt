@@ -3,6 +3,7 @@ package com.cachemon.iotracer
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** Immutable snapshot of tracing progress, observed by the UI. */
 data class TraceStatus(
@@ -21,10 +22,13 @@ object TracerState {
     val status: StateFlow<TraceStatus> = _status.asStateFlow()
 
     fun update(transform: (TraceStatus) -> TraceStatus) {
-        _status.value = transform(_status.value)
+        // Atomic compare-and-set retry loop; safe under concurrent writers
+        // (reader/snapshot/main threads) where a plain read-modify-write could
+        // drop updates.
+        _status.update(transform)
     }
 
     fun reset() {
-        _status.value = TraceStatus(rootAvailable = _status.value.rootAvailable)
+        _status.update { TraceStatus(rootAvailable = it.rootAvailable) }
     }
 }
