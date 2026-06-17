@@ -9,7 +9,12 @@ package com.cachemon.iotracer.parse
  * monotonic [requestId] assigned at issue keeps I/Os that reuse a (dev, sector)
  * pair distinguishable.
  */
-class BlockPairer {
+class BlockPairer(
+    // Cap on outstanding issues awaiting completion. Issues whose completion is
+    // never seen (lost events, merges, re-keys) would otherwise accumulate
+    // unbounded over a long trace; the oldest is evicted past this limit.
+    private val maxInflight: Int = 100_000,
+) {
 
     /** A completed block I/O, ready to be written as a `ds` row. */
     data class DsRow(
@@ -41,7 +46,8 @@ class BlockPairer {
         val requestId: Long,
     )
 
-    private val inflight = HashMap<String, Inflight>()
+    // LinkedHashMap preserves insertion order so the oldest entry is evicted first.
+    private val inflight = LinkedHashMap<String, Inflight>()
     private var nextRequestId = 1L
 
     fun inflightCount(): Int = inflight.size
@@ -59,6 +65,14 @@ class BlockPairer {
             rwbs = info.rwbs,
             requestId = nextRequestId++,
         )
+        // Bound memory: drop the oldest outstanding issue once over the cap.
+        if (inflight.size > maxInflight) {
+            val it = inflight.keys.iterator()
+            if (it.hasNext()) {
+                it.next()
+                it.remove()
+            }
+        }
     }
 
     fun onComplete(c: FtraceParser.Common): DsRow? {

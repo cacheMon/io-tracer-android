@@ -27,8 +27,4 @@ object TracerState {
         // drop updates.
         _status.update(transform)
     }
-
-    fun reset() {
-        _status.update { TraceStatus(rootAvailable = it.rootAvailable) }
-    }
 }

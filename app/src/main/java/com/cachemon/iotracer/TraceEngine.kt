@@ -1,6 +1,8 @@
 package com.cachemon.iotracer
 
 import com.cachemon.iotracer.ftrace.FtraceControl
+import com.cachemon.iotracer.io.Csv
+import com.cachemon.iotracer.io.TimeFmt
 import com.cachemon.iotracer.io.TraceWriter
 import com.cachemon.iotracer.parse.BlockPairer
 import com.cachemon.iotracer.parse.FtraceParser
@@ -99,7 +101,7 @@ class TraceEngine(
                 val row = pairer.onComplete(common) ?: return
                 val command = if (anonymous) simpleHash(row.command) else row.command
                 val ts = monoToWall(row.monoNs)
-                writer.append("ds", com.cachemon.iotracer.io.Csv.row(
+                writer.append("ds", Csv.row(
                     ts, row.operation, row.pid, row.tid, command, row.sector,
                     row.size, row.latencyMs, row.device, row.flags, row.cpuId,
                     row.ppid, row.queueLatencyMs, row.commandFlags,
@@ -148,10 +150,10 @@ class TraceEngine(
         // Reuses a thread-local formatter (see TimeFmt) — this runs once per block
         // I/O completion, which can be thousands per second.
         val realNs = monoNs + realOffset
-        return com.cachemon.iotracer.io.TimeFmt.wallMillis(realNs / 1_000_000L)
+        return TimeFmt.wallMillis(realNs / 1_000_000L)
     }
 
-    private fun stamp(): String = com.cachemon.iotracer.io.TimeFmt.sessionStamp()
+    private fun stamp(): String = TimeFmt.sessionStamp()
 
     companion object {
         fun checkRoot(): Boolean = RootShell().available()

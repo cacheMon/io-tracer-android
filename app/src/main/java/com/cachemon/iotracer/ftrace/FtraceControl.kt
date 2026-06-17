@@ -30,6 +30,10 @@ object FtraceControl {
         append("echo 0 > \$T/events/block/block_rq_complete/enable 2>/dev/null; ")
         append("echo 0 > \$T/tracing_on 2>/dev/null; ")
         append("echo local > \$T/trace_clock 2>/dev/null; ")
+        // Kill any lingering `cat trace_pipe` reader: some `su` implementations
+        // don't forward the parent's SIGTERM to the child, which would otherwise
+        // keep holding the ring buffer open after stop.
+        append("pkill -f trace_pipe 2>/dev/null; ")
         append("true")
     }
 

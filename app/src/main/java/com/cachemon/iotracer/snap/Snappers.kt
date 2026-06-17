@@ -30,21 +30,31 @@ class ProcSnapper(
         var count = 0
         val lines = out.lineSequence().toList()
         for (line in lines.drop(1)) { // drop header
+            val row = parsePsLine(line, ts, monoNs, anonymous) ?: continue
+            writer.append("process", row)
+            count++
+        }
+        writer.flush("process")
+        return count
+    }
+
+    companion object {
+        /**
+         * Parse one `ps -A -o PID,PPID,RSS,VSZ,S,NAME` line into a `process` CSV
+         * row, or null if it isn't a usable data line. Pure (no I/O) so it is
+         * unit-testable without a device.
+         */
+        fun parsePsLine(line: String, ts: String, monoNs: Long, anonymous: Boolean): String? {
             val cols = line.trim().split(Regex("\\s+"))
-            if (cols.size < 6) continue
-            val pid = cols[0].toIntOrNull() ?: continue
+            if (cols.size < 6) return null
+            val pid = cols[0].toIntOrNull() ?: return null
             val rssKb = cols[2].toDoubleOrNull() ?: 0.0
             val vszKb = cols[3].toDoubleOrNull() ?: 0.0
             val status = cols[4]
             var name = cols.subList(5, cols.size).joinToString(" ")
             if (anonymous) name = simpleHash(name)
-            writer.append("process", Csv.row(
-                ts, pid, name, name, vszKb, rssKb, "", 0.0, 0.0, 0.0, status, monoNs,
-            ))
-            count++
+            return Csv.row(ts, pid, name, name, vszKb, rssKb, "", 0.0, 0.0, 0.0, status, monoNs)
         }
-        writer.flush("process")
-        return count
     }
 
     private fun wallNow(): String =

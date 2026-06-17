@@ -3,6 +3,7 @@ package com.cachemon.iotracer
 import com.cachemon.iotracer.parse.BlockPairer
 import com.cachemon.iotracer.parse.FtraceParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -107,5 +108,30 @@ class FtraceParserTest {
         assertEquals(2L, r2.requestId)
         assertEquals(1, r1.pid)
         assertEquals(2, r2.pid)
+    }
+
+    @Test
+    fun pairerEvictsOldestPastCap() {
+        val pairer = BlockPairer(maxInflight = 2)
+        pairer.onIssue(FtraceParser.parseCommon(
+            "a-1 [0] .... 1.0: block_rq_issue: 8,0 R 512 () 10 + 1 [a]")!!)
+        pairer.onIssue(FtraceParser.parseCommon(
+            "b-2 [0] .... 1.1: block_rq_issue: 8,0 R 512 () 20 + 1 [b]")!!)
+        // Third issue evicts the oldest (sector 10).
+        pairer.onIssue(FtraceParser.parseCommon(
+            "c-3 [0] .... 1.2: block_rq_issue: 8,0 R 512 () 30 + 1 [c]")!!)
+        assertEquals(2, pairer.inflightCount())
+
+        // Completion for the evicted sector 10 is unmatched (no latency / pid).
+        val r10 = pairer.onComplete(FtraceParser.parseCommon(
+            "x-9 [0] .... 1.3: block_rq_complete: 8,0 R () 10 + 1 [0]")!!)!!
+        assertNull(r10.latencyMs)
+        assertNull(r10.pid)
+
+        // Sector 30 is still tracked, so it pairs normally.
+        val r30 = pairer.onComplete(FtraceParser.parseCommon(
+            "x-9 [0] .... 1.4: block_rq_complete: 8,0 R () 30 + 1 [0]")!!)!!
+        assertEquals(3, r30.pid)
+        assertNotNull(r30.latencyMs)
     }
 }
