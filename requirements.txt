@@ -1,0 +1,9 @@
+# The Android IO Tracer runs on the Python standard library alone, so it can be
+# executed on a device (Termux) or over `adb shell` with no pip installs.
+#
+# The only optional dependency enables Zstandard (.csv.zst) compression of trace
+# files; without it the tracer still runs and leaves traces uncompressed.
+zstandard>=0.18.0 ; platform_system != "Android"
+
+# For running the test suite:
+#   pip install pytest
