@@ -26,6 +26,12 @@ The on-disk column layout is byte-for-byte compatible with the Linux tracer (see
 [`src/tracer/schema.py`](src/tracer/schema.py)), and every record carries a
 `mono_ns` (CLOCK_MONOTONIC) column for cross-stream correlation.
 
+> **Prefer a UI?** There is also a native **Android app** (`app/` module) that
+> runs the same rooted block-I/O collection with a Start/Stop screen and a
+> foreground service — no host/`adb` driving required. See
+> [docs/ANDROID_APP.md](docs/ANDROID_APP.md). The CLI below remains the reference
+> collector and host driver.
+
 ## Requirements
 
 - An Android device with **root** (the block-I/O collector needs `CAP_SYS_ADMIN`
