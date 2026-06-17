@@ -1,9 +1,12 @@
 # Android App (rooted block-I/O tracer)
 
-A native Android app (`app/` module) that runs the block-I/O collector on-device
-with a Start/Stop UI, instead of driving the Python CLI over `adb`. It produces
-the **same CSV schema** as the Python tracer and the Linux tracer; the only
-difference is the compression container (`.csv.gz` here vs `.csv.zst`).
+The **default, recommended way to use IO-Tracer on Android**: a native app
+(`app/` module) that runs the block-I/O collector on-device with a Start/Stop UI
+and a foreground service — no host or `adb` driving required. It produces the
+**same CSV schema** as the Python CLI and the Linux tracer; the only difference
+is the compression container (`.csv.gz` here vs `.csv.zst`). For scripted or
+host-driven captures, the Python CLI (`iotrc_android.py`) remains available — see
+the repository [README](../README.md).
 
 ## Requirements
 
@@ -71,6 +74,14 @@ APK on every push/PR and uploads the APK as an artifact.
 6. Pull the session:
    ```bash
    adb pull /sdcard/Android/data/com.cachemon.iotracer/files/traces ./traces
+   ```
+   On Android 11+, scoped storage can block `adb` from reading another app's
+   `Android/data` directly (and `adb root` is unavailable on most Magisk-rooted
+   retail devices). If the pull fails, use the in-app **Share** button, or copy
+   to a public directory as root first:
+   ```bash
+   adb shell "su -c 'cp -r /sdcard/Android/data/com.cachemon.iotracer/files/traces /data/local/tmp/traces'"
+   adb pull /data/local/tmp/traces ./traces
    ```
 
 ## Reading the output
