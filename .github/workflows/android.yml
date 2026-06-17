@@ -1,11 +1,21 @@
 name: Android CI
 
 on:
+  # Build feature branches via the pull_request event only; building them on
+  # push as well would run every check twice. Direct pushes to main still build.
   push:
-    branches: [ main, "claude/**" ]
+    branches: [ main ]
     paths: [ "app/**", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", ".github/workflows/android.yml" ]
   pull_request:
     paths: [ "app/**", "build.gradle.kts", "settings.gradle.kts", "gradle.properties", ".github/workflows/android.yml" ]
+
+# Cancel an in-progress run when a newer commit is pushed to the same ref.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
