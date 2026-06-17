@@ -59,22 +59,23 @@ production-signed and refuse `adb root`):
 ```bash
 # Android Studio ▸ Device Manager ▸ create AVD with a "Google APIs" image, then:
 adb root                 # restarts adbd as root (works on non-Play images)
+adb shell setenforce 0   # permissive SELinux — avoids denials when poking tracefs
 adb shell 'ls /sys/kernel/tracing/trace_pipe'   # confirm tracefs is reachable
 ```
 
 With `adb root`, an `adb shell` runs as root, so the **CLI** can trace block I/O
 when run from that shell (push the repo and run it under a root shell that has
 Python — e.g. via Termux installed in the AVD, or an image with Python). To use
-the **app** on an emulator you additionally need an `su` binary; install Magisk
-on the AVD (e.g. the community *rootAVD* script) so the app's root requests
-resolve.
+the **app** on an emulator, either disable SELinux on a `userdebug` image —
+`adb root` then `adb shell setenforce 0`, which lets the app use the image's
+built-in `su` binary — or install Magisk on the AVD (e.g. the community
+*rootAVD* script) so the app's root requests resolve.
 
 ### b. Magisk on a physical device
 
 Root with [Magisk](https://github.com/topjohnwu/Magisk); grant the app (or
 `adb shell`) root. Then follow the normal flow in the
-[README](../README.md#-android-app-recommended) or
-[docs/ANDROID_APP.md](ANDROID_APP.md).
+[README](../README.md) or [ANDROID_APP.md](ANDROID_APP.md).
 
 ### c. `userdebug` / `eng` build
 
