@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose supplies the real (Material 3) theme at runtime; the activity
+         only needs a no-action-bar window, so we extend a platform theme to
+         avoid pulling in the AppCompat/Material XML dependency. -->
+    <style name="Theme.IOTracer" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar" />
+</resources>
