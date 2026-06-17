@@ -129,10 +129,11 @@ into its `-o` output directory.
 └── system_spec/                # cpu/memory/os JSON
 ```
 
-See [docs/TRACE_TYPES.md](docs/TRACE_TYPES.md) and
-[docs/TRACE_FORMAT.md](docs/TRACE_FORMAT.md) for the full schema, and
-[docs/traces/BLOCK_IO_EVENTS.md](docs/traces/BLOCK_IO_EVENTS.md) for how block
-latency is recovered from the issue/complete tracepoint pair.
+Full documentation is indexed in **[docs/](docs/README.md)** —
+[trace types & collection](docs/TRACE_TYPES.md),
+[trace format](docs/TRACE_FORMAT.md) (the full schema), and
+[block I/O events](docs/traces/BLOCK_IO_EVENTS.md) (how latency is recovered from
+the issue/complete tracepoint pair).
 
 ### Reading a trace
 
