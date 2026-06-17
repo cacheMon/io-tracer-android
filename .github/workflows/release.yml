@@ -1,0 +1,93 @@
+name: Release APK
+
+# Build a signed release APK and attach it to a GitHub Release.
+#
+# Triggers:
+#   - pushing a tag like v0.1.0  -> builds and publishes a GitHub Release
+#   - manual "Run workflow"      -> builds and uploads the APK as an artifact
+#
+# Signing:
+#   If the repo defines the KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS /
+#   KEY_PASSWORD secrets, the APK is signed with that keystore (stable signature
+#   across releases — required for in-place app updates). Otherwise an ephemeral
+#   keystore is generated so the build still yields an installable, signed APK
+#   (note: an ephemeral signature changes every run, so such builds can't update
+#   a previously installed copy — reinstall instead).
+
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create the GitHub Release
+
+jobs:
+  release-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
+
+      - name: Resolve signing keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ks"
+          KS="$RUNNER_TEMP/ks/release.jks"
+          if [ -n "${KEYSTORE_BASE64:-}" ]; then
+            echo "Using keystore from repository secrets."
+            echo "$KEYSTORE_BASE64" | base64 -d > "$KS"
+            echo "store_pass=${KEYSTORE_PASSWORD}" >> "$GITHUB_OUTPUT"
+            echo "key_alias=${KEY_ALIAS}"          >> "$GITHUB_OUTPUT"
+            echo "key_pass=${KEY_PASSWORD}"        >> "$GITHUB_OUTPUT"
+          else
+            echo "No KEYSTORE_BASE64 secret; generating an ephemeral keystore."
+            keytool -genkeypair -dname "CN=IO Tracer, O=cacheMon" \
+              -alias iotracer -keyalg RSA -keysize 2048 -validity 10000 \
+              -keystore "$KS" -storepass android -keypass android
+            echo "store_pass=android" >> "$GITHUB_OUTPUT"
+            echo "key_alias=iotracer" >> "$GITHUB_OUTPUT"
+            echo "key_pass=android"   >> "$GITHUB_OUTPUT"
+          fi
+          echo "path=$KS" >> "$GITHUB_OUTPUT"
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_FILE: ${{ steps.keystore.outputs.path }}
+          KEYSTORE_PASSWORD: ${{ steps.keystore.outputs.store_pass }}
+          KEY_ALIAS: ${{ steps.keystore.outputs.key_alias }}
+          KEY_PASSWORD: ${{ steps.keystore.outputs.key_pass }}
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: io-tracer-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/build/outputs/apk/release/*.apk
+          generate_release_notes: true
