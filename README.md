@@ -2,49 +2,71 @@
 
 An I/O logging tool for Android that collects the **same kind of data as the
 [Linux io-tracer](https://github.com/cacheMon/io-tracer-linux)** — block-device
-I/O, process state, filesystem inventory, and system specs — and writes it in the
-**same on-disk schema**, so a single downstream parser can read traces from either
-operating system.
+I/O, process state, and system specs — and writes it in the **same on-disk
+schema**, so a single downstream parser can read traces from either operating
+system.
 
-## How it differs from the Linux tracer
+It ships in two forms that produce the same trace schema:
 
-The Linux tracer collects events with **eBPF/BCC**. That stack is impractical on a
-stock Android device (no BCC, no compiler, no on-device Python packages), so this
-tool collects the equivalent data through interfaces every Android kernel already
-ships:
+| | **📱 Android app** (default) | Command-line collector |
+|---|---|---|
+| Use it when | You want a one-tap, on-device tracer | Scripting / host-driven captures over `adb` |
+| Interface | Start/Stop UI + foreground service | `iotrc_android.py` CLI |
+| Runtime | Kotlin APK, no Python needed | Python 3 (stdlib only) |
+| Streams | block I/O, process, system spec | + filesystem snapshot/events |
+| Compression | `.csv.gz` | `.csv.zst` (optional) |
+| Docs | **[docs/ANDROID_APP.md](docs/ANDROID_APP.md)** | [below](#command-line-collector-advanced) |
 
-| Concern            | Linux io-tracer            | Android io-tracer                         |
-|--------------------|----------------------------|-------------------------------------------|
-| Block I/O          | eBPF kprobes               | **ftrace** `block_rq_issue`/`block_rq_complete` |
-| Process snapshots  | `psutil`                   | direct `/proc` parsing (no deps)          |
-| Filesystem snapshot| `os.walk`                  | `os.walk` (Android roots)                 |
-| System spec        | `psutil` + `lsblk`         | `/proc` + `getprop`                       |
-| Output schema      | `schema.py` v3             | **identical** `schema.py` v3              |
-| Dependencies       | psutil, requests, zstd     | **stdlib only** (zstd optional)           |
+Both require **root** for block-I/O tracing (they read `/sys/kernel/tracing` via
+ftrace). The on-disk column layout is byte-for-byte compatible across both and
+with the Linux tracer (see [`src/tracer/schema.py`](src/tracer/schema.py)); every
+record carries a `mono_ns` (CLOCK_MONOTONIC) column for cross-stream correlation.
 
-The on-disk column layout is byte-for-byte compatible with the Linux tracer (see
-[`src/tracer/schema.py`](src/tracer/schema.py)), and every record carries a
-`mono_ns` (CLOCK_MONOTONIC) column for cross-stream correlation.
+---
 
-> **Prefer a UI?** There is also a native **Android app** (`app/` module) that
-> runs the same rooted block-I/O collection with a Start/Stop screen and a
-> foreground service — no host/`adb` driving required. See
-> [docs/ANDROID_APP.md](docs/ANDROID_APP.md). The CLI below remains the reference
-> collector and host driver.
+## 📱 Android app (recommended)
 
-## Requirements
+A native app (`app/` module) that runs the rooted block-I/O collector on-device
+with a Jetpack Compose Start/Stop screen and a foreground service — no host or
+`adb` driving required.
 
-- An Android device with **root** (the block-I/O collector needs `CAP_SYS_ADMIN`
-  on tracefs — a rooted or `userdebug` build).
-- `python3` available on the device (e.g. via Termux) **or** drive it from a host
-  over `adb`.
-- ftrace mounted at `/sys/kernel/tracing` (or `/sys/kernel/debug/tracing`).
-- Optional: `pip install zstandard` to compress traces to `.csv.zst` (without it
-  the tracer still runs and leaves CSVs uncompressed).
+**Requirements:** a rooted / `userdebug` device (Android 8.0+, minSdk 26).
 
-No other Python packages are required.
+```bash
+# Build the debug APK (or just open the repo in Android Studio and Run ▶)
+gradle :app:assembleDebug
 
-## Usage
+# Install on a rooted device
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+Then on the device:
+
+1. Launch **IO Tracer** and grant the `su` request.
+2. Choose options (anonymize, snapshot interval) and tap **Start tracing**.
+3. Reproduce your workload — the notification shows live event counts.
+4. Tap **Stop**; buffers flush, ftrace state is restored, `manifest.json` is written.
+
+Pull the results:
+
+```bash
+adb pull /sdcard/Android/data/com.cachemon.iotracer/files/traces ./traces
+```
+
+Full build/run/architecture details — and the note on keeping the Kotlin engine
+in sync with the Python schema — are in **[docs/ANDROID_APP.md](docs/ANDROID_APP.md)**.
+
+Without root the app still runs, but only the process/system snapshots are
+collected (no system-wide block I/O).
+
+---
+
+## Command-line collector (advanced)
+
+For scripted or host-driven captures, `iotrc_android.py` collects the same data
+(plus filesystem snapshots/events) via ftrace + `/proc`, using only the Python
+standard library — runnable on-device under Termux or driven from a host over
+`adb`.
 
 ```
 usage: iotrc_android.py [-h] [-o OUTPUT] [-a] [--trace-fs] [--fs-snapshot]
@@ -60,9 +82,8 @@ options:
   --computer-id           Print this device's anonymized machine ID and exit
 ```
 
-### Run on-device (rooted, with Python)
-
 ```bash
+# Drive a rooted device from a host
 adb push . /data/local/tmp/iotracer
 adb shell "su 0 python3 /data/local/tmp/iotracer/iotrc_android.py \
     -o /data/local/tmp/trace --fs-snapshot"
@@ -70,26 +91,24 @@ adb shell "su 0 python3 /data/local/tmp/iotracer/iotrc_android.py \
 adb pull /data/local/tmp/trace ./trace
 ```
 
-The tracer runs until it receives `SIGINT`/`SIGTERM`, then flushes all buffers,
+The CLI runs until it receives `SIGINT`/`SIGTERM`, then flushes all buffers,
 restores the device's original ftrace state, and writes `manifest.json`.
+`pip install zstandard` enables `.csv.zst` compression (without it traces are
+left uncompressed). If tracefs is unavailable it falls back to **snapshot-only
+mode** (process/filesystem/system specs, no `ds`/`fs` event streams).
 
-### Snapshot-only mode
-
-If tracefs is not accessible (no root, or block events unavailable), the tool
-automatically falls back to **snapshot-only mode**: it still collects process,
-filesystem, and system-spec data and writes a valid session — only the `ds`/`fs`
-event streams are skipped.
+---
 
 ## Output
 
 ```
-{output_dir}/
+{output_dir}/<session>/
 ├── manifest.json               # schema + machine id + clock offset + row counts
-├── ds/                         # block I/O events  (ds_*.csv.zst)
-├── fs/                         # filesystem events (fs_*.csv.zst, with --trace-fs)
-├── process/                    # periodic /proc snapshots
-├── filesystem_snapshot/        # one-shot inventory (with --fs-snapshot)
-└── system_spec/                # cpu/memory/disk/os JSON
+├── ds/                         # block I/O events       (.csv.gz app / .csv.zst CLI)
+├── fs/                         # filesystem events      (CLI --trace-fs)
+├── process/                    # periodic process snapshots
+├── filesystem_snapshot/        # one-shot inventory     (CLI --fs-snapshot)
+└── system_spec/                # cpu/memory/os JSON
 ```
 
 See [docs/TRACE_TYPES.md](docs/TRACE_TYPES.md) and
@@ -101,19 +120,43 @@ latency is recovered from the issue/complete tracepoint pair.
 
 ```python
 import glob, pandas as pd
-# pandas reads .zst natively when the `zstandard` package is installed.
-df = pd.concat(pd.read_csv(f) for f in glob.glob("trace/ds/ds_*.csv.zst"))
+# pandas reads .gz and .zst natively (.zst needs the `zstandard` package).
+files = glob.glob("traces/*/ds/ds_*.csv.gz") + glob.glob("trace/ds/ds_*.csv.zst")
+df = pd.concat(pd.read_csv(f) for f in files)
 print(df.groupby("operation")["latency_ms"].describe())
 ```
+
+---
+
+## How it differs from the Linux tracer
+
+The Linux tracer collects events with **eBPF/BCC**. That stack is impractical on a
+stock Android device (no BCC, no compiler, no on-device Python packages), so this
+tool collects the equivalent data through interfaces every Android kernel already
+ships:
+
+| Concern            | Linux io-tracer            | Android io-tracer                         |
+|--------------------|----------------------------|-------------------------------------------|
+| Block I/O          | eBPF kprobes               | **ftrace** `block_rq_issue`/`block_rq_complete` |
+| Process snapshots  | `psutil`                   | direct `/proc` / `ps` parsing             |
+| System spec        | `psutil` + `lsblk`         | `/proc` + `getprop`                       |
+| Output schema      | `schema.py` v3             | **identical** `schema.py` v3              |
+| Dependencies       | psutil, requests, zstd     | app: none · CLI: stdlib only              |
+
+---
 
 ## Tests
 
 ```bash
+# App engine (Kotlin parser/pairer/writer/proc) — runs in CI on every push/PR
+gradle :app:testDebugUnitTest
+
+# CLI (Python)
 pip install pytest
 python3 -m pytest -q
 ```
 
-The suite covers ftrace line parsing, block issue/complete pairing and latency
-recovery, the cross-OS schema contract, the writer's on-disk layout/manifest, and
-the `/proc` process snapper (the last runs against the live `/proc`, so it works
-on any Linux/Android host).
+The Python suite covers ftrace line parsing, block issue/complete pairing and
+latency recovery, the cross-OS schema contract, the writer's on-disk
+layout/manifest, and the `/proc` process snapper. The Kotlin suite mirrors the
+parser/pairer tests and adds writer/process-line coverage.

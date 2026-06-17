@@ -1,9 +1,12 @@
 # Android App (rooted block-I/O tracer)
 
-A native Android app (`app/` module) that runs the block-I/O collector on-device
-with a Start/Stop UI, instead of driving the Python CLI over `adb`. It produces
-the **same CSV schema** as the Python tracer and the Linux tracer; the only
-difference is the compression container (`.csv.gz` here vs `.csv.zst`).
+The **default, recommended way to use IO-Tracer on Android**: a native app
+(`app/` module) that runs the block-I/O collector on-device with a Start/Stop UI
+and a foreground service — no host or `adb` driving required. It produces the
+**same CSV schema** as the Python CLI and the Linux tracer; the only difference
+is the compression container (`.csv.gz` here vs `.csv.zst`). For scripted or
+host-driven captures, the Python CLI (`iotrc_android.py`) remains available — see
+the repository [README](../README.md).
 
 ## Requirements
 
