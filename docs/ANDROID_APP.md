@@ -87,7 +87,7 @@ To create the keystore for the secrets path:
 ```bash
 keytool -genkeypair -v -keystore release.jks -alias iotracer \
   -keyalg RSA -keysize 2048 -validity 10000
-base64 -w0 release.jks   # paste into the KEYSTORE_BASE64 repo secret
+base64 release.jks | tr -d '\n'   # paste into the KEYSTORE_BASE64 repo secret
 ```
 
 Build a signed release APK locally:

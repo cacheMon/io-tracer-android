@@ -16,16 +16,30 @@ android {
     }
 
     // Release signing is driven by environment variables (set by the release
-    // workflow). When KEYSTORE_FILE is absent — e.g. a plain local `assembleDebug`
-    // — no signing config is attached and the release variant is left unsigned.
-    val keystoreFile = System.getenv("KEYSTORE_FILE")
+    // workflow). When they are absent — e.g. a plain local `assembleDebug` — no
+    // signing config is attached and the release variant is left unsigned.
+    val envKeystoreFile = System.getenv("KEYSTORE_FILE")
+    val envKeystorePassword = System.getenv("KEYSTORE_PASSWORD")
+    val envKeyAlias = System.getenv("KEY_ALIAS")
+    val envKeyPassword = System.getenv("KEY_PASSWORD")
+    val hasSigningEnv = !envKeystoreFile.isNullOrEmpty() &&
+        !envKeystorePassword.isNullOrEmpty() &&
+        !envKeyAlias.isNullOrEmpty() &&
+        !envKeyPassword.isNullOrEmpty()
+    // Fail loudly on a half-configured keystore rather than silently publishing an
+    // unsigned release: if a keystore is named, the rest must be present too.
+    require(envKeystoreFile.isNullOrEmpty() || hasSigningEnv) {
+        "KEYSTORE_FILE is set, but one or more of KEYSTORE_PASSWORD, KEY_ALIAS, " +
+            "KEY_PASSWORD is missing or empty."
+    }
     signingConfigs {
         create("release") {
-            if (keystoreFile != null) {
-                storeFile = file(keystoreFile)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+            if (hasSigningEnv) {
+                // Resolve a relative path against the repo root, not the app module.
+                storeFile = rootProject.file(envKeystoreFile!!)
+                storePassword = envKeystorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
             }
         }
     }
@@ -37,7 +51,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (keystoreFile != null) {
+            if (hasSigningEnv) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
