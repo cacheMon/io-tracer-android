@@ -66,6 +66,40 @@ gradle :app:testDebugUnitTest      # run the parser/pairer unit tests
 CI (`.github/workflows/android.yml`) runs the unit tests and assembles the debug
 APK on every push/PR and uploads the APK as an artifact.
 
+## Releases (signed release APK)
+
+A signed **release** APK is produced by `.github/workflows/release.yml`:
+
+- **Push a tag** `vX.Y.Z` (e.g. `git tag v0.1.0 && git push origin v0.1.0`) — the
+  workflow builds, signs, and publishes a **GitHub Release** with the APK attached.
+- Or trigger it manually from **Actions ▸ Release APK ▸ Run workflow**; the signed
+  APK is uploaded as a workflow artifact.
+
+**Signing.** If the repo defines `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
+`KEY_ALIAS`, and `KEY_PASSWORD` secrets, the APK is signed with that keystore —
+use this so updates install in place over previous versions. Without those
+secrets the workflow generates an **ephemeral** keystore so the build still yields
+an installable, signed APK; note an ephemeral signature changes every run, so
+those builds can't update an already-installed copy (uninstall first).
+
+To create the keystore for the secrets path:
+
+```bash
+keytool -genkeypair -v -keystore release.jks -alias iotracer \
+  -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 release.jks   # paste into the KEYSTORE_BASE64 repo secret
+```
+
+Build a signed release APK locally:
+
+```bash
+KEYSTORE_FILE=$PWD/release.jks KEYSTORE_PASSWORD=… KEY_ALIAS=iotracer KEY_PASSWORD=… \
+  gradle :app:assembleRelease     # APK -> app/build/outputs/apk/release/
+```
+
+> Release builds use the same code as debug (`isMinifyEnabled = false`); only
+> signing differs. The app still requires **root** at runtime.
+
 ## Run
 
 1. Install the debug APK on a rooted device (`adb install app-debug.apk`).
