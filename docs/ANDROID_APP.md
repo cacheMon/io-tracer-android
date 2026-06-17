@@ -1,5 +1,7 @@
 # Android App (rooted block-I/O tracer)
 
+> 📖 [Docs index](README.md) · no rooted device? see [Quick start without root](UNROOTED.md).
+
 The **default, recommended way to use IO-Tracer on Android**: a native app
 (`app/` module) that runs the block-I/O collector on-device with a Start/Stop UI
 and a foreground service — no host or `adb` driving required. It produces the

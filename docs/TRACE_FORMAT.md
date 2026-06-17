@@ -1,11 +1,15 @@
 # Trace Output Format (Android)
 
-This document describes the CSV output of the Android IO Tracer. The on-disk
-schema is defined once, in [`src/tracer/schema.py`](../src/tracer/schema.py),
-which is the single source of truth — the CSV header rows and `manifest.json` are
-both derived from it. The layout is kept **byte-for-byte compatible** with the
-Linux io-tracer so one parser reads either OS. Bump `SCHEMA_VERSION` whenever
-columns change.
+> 📖 [Docs index](README.md) · for *what* each stream is and *how* it's collected
+> see [Trace types & collection](TRACE_TYPES.md).
+
+This document describes the CSV output of the Android IO Tracer (both the app and
+the CLI). The on-disk schema is defined once, in
+[`src/tracer/schema.py`](../src/tracer/schema.py), which is the single source of
+truth — the CSV header rows and `manifest.json` are both derived from it (the
+app's `Schema.kt` mirrors it 1:1). The layout is kept **byte-for-byte
+compatible** with the Linux io-tracer so one parser reads any of them. Bump
+`SCHEMA_VERSION` whenever columns change.
 
 ## Output Structure
 
@@ -21,10 +25,11 @@ columns change.
 
 Each stream's CSV begins with a header row and ends every record with a `mono_ns`
 (CLOCK_MONOTONIC nanoseconds) column — the common clock for correlating records
-across streams. CSV files are compressed to `.csv.zst` (Zstandard) when the
-`zstandard` package is installed; otherwise they are left as `.csv`.
+across streams. CSV files are compressed: the **app** writes `.csv.gz` (gzip);
+the **CLI** writes `.csv.zst` (Zstandard) when the `zstandard` package is
+installed, otherwise plain `.csv`. The columns are identical regardless.
 
-File naming: `{type}_{YYYYMMDD_HHMMSS_mmm}_{seq}.csv[.zst]`.
+File naming: `{type}_{YYYYMMDD_HHMMSS_mmm}_{seq}.csv{.gz|.zst}`.
 
 ### manifest.json
 
@@ -125,10 +130,34 @@ JSON files capturing device hardware/software at trace start:
 
 ## Reading Compressed Traces
 
+`pandas` reads both containers natively (`.zst` needs the `zstandard` package):
+
 ```python
-import csv, io, zstandard
-with open("ds_*.csv.zst", "rb") as fh:
-    text = io.TextIOWrapper(zstandard.ZstdDecompressor().stream_reader(fh), encoding="utf-8")
-    for row in csv.DictReader(text):
+import glob, pandas as pd
+# app traces: traces/<session>/ds/*.csv.gz   ·   CLI traces: <out>/ds/*.csv.zst
+files = glob.glob("traces/*/ds/ds_*.csv.gz") + glob.glob("trace/ds/ds_*.csv.zst")
+df = pd.concat(pd.read_csv(f) for f in files)
+print(df.groupby("operation")["latency_ms"].describe())
+```
+
+To stream one file with the stdlib (`csv.DictReader` needs a **text** stream):
+
+```python
+import csv, gzip, io, zstandard
+
+# .csv.gz (app) — gzip.open with "rt" already yields text:
+with gzip.open("ds_0001.csv.gz", "rt", encoding="utf-8") as fh:
+    for row in csv.DictReader(fh):
+        print(row["operation"], row["size"], row["latency_ms"])
+
+# .csv.zst (CLI) — the decompressor yields bytes, so wrap it in TextIOWrapper:
+with open("ds_0001.csv.zst", "rb") as raw:
+    fh = io.TextIOWrapper(zstandard.ZstdDecompressor().stream_reader(raw), encoding="utf-8")
+    for row in csv.DictReader(fh):
         print(row["operation"], row["size"], row["latency_ms"])
 ```
+
+## See also
+
+- [Trace types & collection](TRACE_TYPES.md) — what each stream is and how it's collected.
+- [Block I/O events](traces/BLOCK_IO_EVENTS.md) — the `ds` stream in detail.

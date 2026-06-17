@@ -1,5 +1,7 @@
 # Block I/O Events (Android)
 
+> 📖 [Docs index](../README.md) · [Trace types](../TRACE_TYPES.md) · [Trace format](../TRACE_FORMAT.md)
+
 **Description:** Block-level device I/O operations, the primary trace stream on
 Android. Provides insight into physical storage activity (eMMC/UFS/loop devices).
 

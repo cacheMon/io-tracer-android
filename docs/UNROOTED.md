@@ -1,5 +1,7 @@
 # Quick start without a rooted phone
 
+> 📖 [Docs index](README.md) · for the rooted flow see [Android app](ANDROID_APP.md).
+
 Block-I/O tracing reads the kernel's **ftrace** interface
 (`/sys/kernel/tracing`), which is **root-only** — so the `ds` (block I/O) stream
 can't be captured without root. This guide covers what you *can* do on an
